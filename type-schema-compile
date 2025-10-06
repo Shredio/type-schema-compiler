@@ -4,6 +4,8 @@
 use Nette\Utils\Finder;
 use Shredio\TypeSchemaCompiler\StandaloneMapperCompiler;
 
+require __DIR__ . '/../../autoload.php';
+
 $arguments = $_SERVER['argv'];
 
 if (count($arguments) < 4) {
