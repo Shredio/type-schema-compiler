@@ -1,0 +1,44 @@
+#!/usr/bin/env php
+<?php declare(strict_types = 1);
+
+use Nette\Utils\Finder;
+use Shredio\TypeSchemaCompiler\StandaloneMapperCompiler;
+
+$arguments = $_SERVER['argv'];
+
+if (count($arguments) < 4) {
+	echo "Usage: type-schema-compiler <path-to-scan> <output-path> <target-name-pattern>\n";
+	exit(1);
+}
+
+/** @var string $pathToScan */
+$pathToScan = $arguments[1];
+/** @var string $outputPath */
+$outputPath = $arguments[2];
+/** @var string $targetNamePattern */
+$targetNamePattern = $arguments[3];
+
+if (!is_dir($pathToScan)) {
+	echo "Error: Path to scan is not a directory.\n";
+	exit(1);
+}
+
+if ($outputPath === '') {
+	echo "Error: Output path is empty.\n";
+	exit(1);
+}
+
+if (!is_dir($outputPath) && !is_dir(dirname($outputPath))) {
+	echo "Error: Output path directory does not exist.\n";
+	exit(1);
+}
+
+if ($targetNamePattern === '' || !str_contains($targetNamePattern, '%s')) {
+	echo "Error: Target name pattern is invalid. It must contain '%s'.\n";
+	exit(1);
+}
+
+StandaloneMapperCompiler::create($outputPath, $targetNamePattern)->compileByAttributes(
+	Finder::findFiles('*.php')->from($pathToScan),
+);
+

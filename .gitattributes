@@ -1,0 +1,6 @@
+/tests export-ignore
+/.github export-ignore
+/*.xml.dist export-ignore
+/phpstan.neon export-ignore
+/LICENSE export-ignore
+/.gitignore export-ignore
