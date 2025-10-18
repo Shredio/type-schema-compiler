@@ -7,26 +7,30 @@ use Nette\PhpGenerator\Method;
 use Nette\PhpGenerator\Printer;
 use PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
-use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ArrayNode;
-use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
-use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaCodeFormatter;
+use ReflectionClass;
 use Shredio\TypeSchema\Context\TypeContext;
 use Shredio\TypeSchema\Error\ErrorElement;
 use Shredio\TypeSchema\TypeSchema;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ArrayNode;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\DumpNode;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaCodeFormatter;
+use Shredio\TypeSchemaCompiler\Attribute\CompileObjectMapper;
 
 final readonly class MapperCodeBuilder
 {
 
 	/**
+	 * @param ReflectionClass<object> $reflectionClass
 	 * @param array<string, CompiledProperty> $properties
 	 */
-	public function build(string $className, string $targetNamespace, string $targetShortName, array $properties): string
+	public function build(ReflectionClass $reflectionClass, string $className, string $targetNamespace, string $targetShortName, array $properties): string
 	{
 		$definition = new ClassDefinition($className, $targetShortName, $targetNamespace);
 		$this->initializeDefinition($definition);
 
 		// parse()
-		$this->buildParse($definition, $properties);
+		$this->buildParse($definition, $properties, $reflectionClass);
 
 		// getTypeNode(TypeContext $context)
 		$this->buildGetTypeNode($definition);
@@ -36,8 +40,9 @@ final readonly class MapperCodeBuilder
 
 	/**
 	 * @param array<string, CompiledProperty> $properties
+	 * @param ReflectionClass<object> $reflectionClass
 	 */
-	private function buildParse(ClassDefinition $definition, array $properties): void
+	private function buildParse(ClassDefinition $definition, array $properties, ReflectionClass $reflectionClass): void
 	{
 		$parseMethod = $this->createParseMethod($definition);
 
@@ -45,7 +50,7 @@ final readonly class MapperCodeBuilder
 		$this->initializeTypeSchema($parseMethod, $definition, 'ts');
 
 		$this->section($parseMethod, '1. Define schema', 1);
-		$this->defineSchema($parseMethod, $definition, $properties, 'ts', 'schema');
+		$this->defineSchema($parseMethod, $definition, $properties, $reflectionClass, 'ts', 'schema');
 
 		$this->section($parseMethod, '2. Map values', 1);
 		$this->mapValues($parseMethod, 'schema', 'values');
@@ -72,14 +77,35 @@ final readonly class MapperCodeBuilder
 
 	/**
 	 * @param array<string, CompiledProperty> $properties
+	 * @param ReflectionClass<object> $reflectionClass
 	 */
-	private function defineSchema(Method $method, ClassDefinition $definition, array $properties, string $typeSchemaVar, string $schemaVar): void
+	private function defineSchema(
+		Method $method,
+		ClassDefinition $definition,
+		array $properties,
+		ReflectionClass $reflectionClass,
+		string $typeSchemaVar,
+		string $schemaVar,
+	): void
 	{
 		$nodes = array_map(
 			fn (CompiledProperty $property) => $property->typeSchemaNode,
 			$properties,
 		);
-		$node = new MethodNode('arrayShape', [new ArrayNode($nodes, true)]);
+		/** @var CompileObjectMapper|null $attribute */
+		$attribute = ($reflectionClass->getAttributes(CompileObjectMapper::class)[0] ?? null)?->newInstance();
+		$identifier = $attribute?->identifier;
+
+		$nodes = [new ArrayNode($nodes, true)];
+		if ($identifier !== null) {
+			if (!isset($properties[$identifier])) {
+				throw new \LogicException(sprintf('Identifier property "%s" not found in class %s.', $identifier, $reflectionClass->getName()));
+			}
+
+			$nodes['identifier'] = new DumpNode($identifier);
+		}
+
+		$node = new MethodNode('arrayShape', $nodes);
 
 		$formatter = new TypeSchemaCodeFormatter($definition->namespaceResolver, $typeSchemaVar);
 		$method->addBody('$? = ?;', [$schemaVar, new Literal($formatter->format($node))]);

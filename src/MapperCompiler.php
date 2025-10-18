@@ -22,23 +22,26 @@ use PHPStan\PhpDocParser\Parser\PhpDocParser;
 use PHPStan\PhpDocParser\Parser\TokenIterator;
 use PHPStan\PhpDocParser\Parser\TypeParser;
 use PHPStan\PhpDocParser\ParserConfig;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionParameter;
 use ReflectionProperty;
 use RuntimeException;
+use Shredio\TypeSchema\Mapper\Jit\ClassMapperCompiler;
+use Shredio\TypeSchema\Mapper\Jit\ClassMapperToCompile;
+use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
+use Shredio\TypeSchema\TypeSystem\TypeNodeHelper;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ArrayNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ClassNameNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\DumpNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\NewClassNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaNode;
+use Shredio\TypeSchemaCompiler\Attribute\PropertyCompileOptions;
 use Shredio\TypeSchemaCompiler\Helper\ReflectionHelper;
 use Shredio\TypeSchemaCompiler\Lock\FileLock;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompiler;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperToCompile;
-use Shredio\TypeSchema\TypeSystem\TypeNodeHelper;
 
-final class MapperCompiler implements ObjectMapperCompiler
+final class MapperCompiler implements ClassMapperCompiler
 {
 
 	/** @var array<class-string, bool> */
@@ -67,7 +70,7 @@ final class MapperCompiler implements ObjectMapperCompiler
 		return new self($phpDocLexer, $phpDocParser, $autoRefresh, $multiProcessSafe);
 	}
 
-	public function compile(ObjectMapperToCompile $objectMapperData, ObjectMapperCompilerContext $context): void
+	public function compile(ClassMapperToCompile $objectMapperData, ObjectMapperCompilerContext $context): void
 	{
 		if (isset($this->compiled[$objectMapperData->className])) {
 			return;
@@ -93,7 +96,7 @@ final class MapperCompiler implements ObjectMapperCompiler
 		});
 	}
 
-	public function needsRecompile(ObjectMapperToCompile $objectMapperData): bool
+	public function needsRecompile(ClassMapperToCompile $objectMapperData): bool
 	{
 		return $this->autoRefresh;
 	}
@@ -108,8 +111,12 @@ final class MapperCompiler implements ObjectMapperCompiler
 	): string
 	{
 		$builder = new MapperCodeBuilder();
+		if (str_starts_with($reflectionClass->getName(), 'class@anonymous')) {
+			throw new \LogicException('Cannot build mapper for anonymous classes.');
+		}
 
 		return $builder->build(
+			$reflectionClass,
 			$reflectionClass->getName(),
 			Helpers::extractNamespace($mapperClassName),
 			Helpers::extractShortName($mapperClassName),
@@ -126,15 +133,16 @@ final class MapperCompiler implements ObjectMapperCompiler
 		$properties = [];
 		$docTypes = $this->getPhpDocTypes($reflectionClass);
 		foreach (ReflectionHelper::getConstructorParameters($reflectionClass) as $parameter) {
-			$typeNode = $this->compileType($reflectionClass, $parameter, $docTypes, $context);
-			if ($parameter->isOptional()) {
+			$options = $this->getPropertyOptionsAttribute($parameter);
+			$typeNode = $this->compileType($reflectionClass, $parameter, $docTypes, $options, $context);
+			if ($isOptional = $this->isParameterOptional($parameter, $options)) {
 				$typeNode = $this->createOptionalProperty($typeNode);
 			}
 
 			$properties[$parameter->getName()] = new CompiledProperty(
 				$parameter->getName(),
 				true,
-				$parameter->isOptional(),
+				!$isOptional,
 				$typeNode,
 			);
 		}
@@ -144,20 +152,50 @@ final class MapperCompiler implements ObjectMapperCompiler
 				continue;
 			}
 
-			$typeNode = $this->compileType($reflectionClass, $property, $docTypes, $context);
-			if ($property->hasDefaultValue()) {
+			$options = $this->getPropertyOptionsAttribute($property);
+			$typeNode = $this->compileType($reflectionClass, $property, $docTypes, $options, $context);
+			if ($isOptional = $this->isPropertyOptional($property, $options)) {
 				$typeNode = $this->createOptionalProperty($typeNode);
 			}
 
 			$properties[$property->getName()] = new CompiledProperty(
 				$property->getName(),
 				false,
-				!$property->hasDefaultValue(),
+				!$isOptional,
 				$typeNode,
 			);
 		}
 
 		return $properties;
+	}
+
+	private function isParameterOptional(ReflectionParameter $parameter, PropertyCompileOptions $options): bool
+	{
+		if (is_bool($options->optional)) {
+			return $options->optional;
+		}
+
+		return $parameter->isOptional();
+	}
+
+	private function isPropertyOptional(ReflectionProperty $property, PropertyCompileOptions $options): bool
+	{
+		if (is_bool($options->optional)) {
+			return $options->optional;
+		}
+
+		return $property->hasDefaultValue();
+	}
+
+	private function getPropertyOptionsAttribute(ReflectionParameter|ReflectionProperty $reflection): PropertyCompileOptions
+	{
+		$attribute = $reflection->getAttributes(PropertyCompileOptions::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
+		if ($attribute === null) {
+			return new PropertyCompileOptions();
+		}
+
+		/** @var PropertyCompileOptions */
+		return $attribute->newInstance();
 	}
 
 	/**
@@ -220,14 +258,14 @@ final class MapperCompiler implements ObjectMapperCompiler
 	 */
 	private function createForInnerClass(string $className, ObjectMapperCompilerContext $context): TypeSchemaNode
 	{
-		$objectMapperToCompile = $context->createObjectMapperToCompile($className);
-		if ($context->hasProviderFor($objectMapperToCompile)) {
+		$ClassMapperToCompile = $context->createClassMapperToCompile($className);
+		if ($context->hasProviderFor($ClassMapperToCompile)) {
 			return new MethodNode('mapper', [new ClassNameNode($className)]);
 		}
 
-		$this->compile($objectMapperToCompile, $context);
+		$this->compile($ClassMapperToCompile, $context);
 
-		return new NewClassNode($objectMapperToCompile->mapperClassName);
+		return new NewClassNode($ClassMapperToCompile->mapperClassName);
 	}
 
 	private function parsePhpDoc(string $docComment): PhpDocNode
@@ -244,6 +282,7 @@ final class MapperCompiler implements ObjectMapperCompiler
 		ReflectionClass $reflectionClass,
 		ReflectionParameter|ReflectionProperty $reflection,
 		array $docTypes,
+		PropertyCompileOptions $options,
 		ObjectMapperCompilerContext $context,
 	): TypeSchemaNode
 	{
@@ -258,10 +297,10 @@ final class MapperCompiler implements ObjectMapperCompiler
 			}
 		}
 
-		return $this->createFromTypeNode($typeNode, $context);
+		return $this->createFromTypeNode($typeNode, $options, $context);
 	}
 
-	private function createFromTypeNode(TypeNode $typeNode, ObjectMapperCompilerContext $context): TypeSchemaNode
+	private function createFromTypeNode(TypeNode $typeNode, PropertyCompileOptions $options, ObjectMapperCompilerContext $context): TypeSchemaNode
 	{
 		$typeNode = $this->normalizeType($typeNode);
 
@@ -291,14 +330,17 @@ final class MapperCompiler implements ObjectMapperCompiler
 		if ($typeNode instanceof ArrayTypeNode) {
 			return new MethodNode('array', [
 				new MethodNode('arrayKey'),
-				$this->createFromTypeNode($typeNode->type, $context),
+				$this->createFromTypeNode($typeNode->type, $options, $context),
 			]);
 		}
 
 		if ($typeNode instanceof NullableTypeNode) {
-			return new MethodNode('nullable', [
-				$this->createFromTypeNode($typeNode->type, $context),
-			]);
+			$args = [$this->createFromTypeNode($typeNode->type, $options, $context)];
+			if ($options->nullValues !== []) {
+				$args[] = new DumpNode($options->nullValues);
+			}
+
+			return new MethodNode('nullable', $args);
 		}
 
 		if ($typeNode instanceof GenericTypeNode) {
@@ -306,11 +348,11 @@ final class MapperCompiler implements ObjectMapperCompiler
 				'array' => match (count($typeNode->genericTypes)) {
 					1 => new MethodNode('array', [
 						new MethodNode('arrayKey'),
-						$this->createFromTypeNode($typeNode->genericTypes[0], $context),
+						$this->createFromTypeNode($typeNode->genericTypes[0], $options, $context),
 					]),
 					2 => new MethodNode('array', [
-						$this->createFromTypeNode($typeNode->genericTypes[0], $context),
-						$this->createFromTypeNode($typeNode->genericTypes[1], $context),
+						$this->createFromTypeNode($typeNode->genericTypes[0], $options, $context),
+						$this->createFromTypeNode($typeNode->genericTypes[1], $options, $context),
 					]),
 					default => $this->invalidTypeNode($typeNode),
 				},
@@ -323,13 +365,13 @@ final class MapperCompiler implements ObjectMapperCompiler
 				},
 				'list' => match (count($typeNode->genericTypes)) {
 					1 => new MethodNode('list', [
-						$this->createFromTypeNode($typeNode->genericTypes[0], $context),
+						$this->createFromTypeNode($typeNode->genericTypes[0], $options, $context),
 					]),
 					default => $this->invalidTypeNode($typeNode),
 				},
 				'non-empty-list' => match (count($typeNode->genericTypes)) {
 					1 => new MethodNode('nonEmptyList', [
-						$this->createFromTypeNode($typeNode->genericTypes[0], $context),
+						$this->createFromTypeNode($typeNode->genericTypes[0], $options, $context),
 					]),
 					default => $this->invalidTypeNode($typeNode),
 				},
@@ -340,7 +382,7 @@ final class MapperCompiler implements ObjectMapperCompiler
 		if ($typeNode instanceof UnionTypeNode) {
 			return new MethodNode(
 				'union',
-				array_values(array_map(fn (TypeNode $type) => $this->createFromTypeNode($type, $context), $typeNode->types)),
+				[new ArrayNode(array_values(array_map(fn (TypeNode $type): TypeSchemaNode => $this->createFromTypeNode($type, $options, $context), $typeNode->types)))],
 			);
 		}
 

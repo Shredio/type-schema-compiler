@@ -22,7 +22,7 @@ final readonly class TypeSchemaCodeFormatter
 	{
 		if ($node instanceof MethodNode) {
 			return $this->dumper->format(
-				'$?->?(...?)',
+				'$?->?(...?:)',
 				$this->typeSchemaVariableName, $node->method, $this->formatNodes($node->nodes),
 			);
 		}
@@ -62,8 +62,8 @@ final readonly class TypeSchemaCodeFormatter
 	}
 
 	/**
-	 * @param list<TypeSchemaNode> $nodes
-	 * @return list<Literal>
+	 * @param array<TypeSchemaNode> $nodes
+	 * @return array<Literal>
 	 */
 	private function formatNodes(array $nodes): array
 	{

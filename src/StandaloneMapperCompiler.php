@@ -4,15 +4,15 @@ namespace Shredio\TypeSchemaCompiler;
 
 use Nette\PhpGenerator\Helpers;
 use Nette\Utils\FileSystem;
-use Shredio\TypeSchema\Mapper\DefaultObjectMapperProvider;
-use Shredio\TypeSchema\Mapper\Jit\Attribute\CompileObjectMapper;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompileHashedInfoProvider;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompileInfoProvider;
+use Shredio\TypeSchema\Mapper\ClassMapperProvider;
+use Shredio\TypeSchema\Mapper\Jit\ClassMapperCompileHashedTargetProvider;
+use Shredio\TypeSchema\Mapper\Jit\ClassMapperCompileStaticTargetProvider;
+use Shredio\TypeSchema\Mapper\Jit\ClassMapperCompileTargetProvider;
+use Shredio\TypeSchema\Mapper\Jit\ClassMapperToCompile;
 use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompileStaticInfoProvider;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperToCompile;
-use Shredio\TypeSchema\Mapper\ObjectMapperProvider;
+use Shredio\TypeSchema\Mapper\RegistryClassMapperProvider;
 use Shredio\TypeSchema\Types\Type;
+use Shredio\TypeSchemaCompiler\Attribute\CompileObjectMapper;
 use SplFileInfo;
 
 final readonly class StandaloneMapperCompiler
@@ -20,8 +20,8 @@ final readonly class StandaloneMapperCompiler
 
 	public function __construct(
 		private MapperCompiler $compiler,
-		private ObjectMapperCompileInfoProvider $objectMapperCompileInfoProvider,
-		private ObjectMapperProvider $objectMapperProvider,
+		private ClassMapperCompileTargetProvider $classMapperCompileTargetProvider,
+		private ClassMapperProvider $classMapperProvider,
 	)
 	{
 	}
@@ -37,12 +37,12 @@ final readonly class StandaloneMapperCompiler
 	): self
 	{
 		if ($hashed) {
-			$objectMapperCompileInfoProvider = new ObjectMapperCompileHashedInfoProvider(
+			$objectMapperCompileInfoProvider = new ClassMapperCompileHashedTargetProvider(
 				$directoryPath,
 				$mapperClassNamePattern,
 			);
 		} else {
-			$objectMapperCompileInfoProvider = new ObjectMapperCompileStaticInfoProvider(
+			$objectMapperCompileInfoProvider = new ClassMapperCompileStaticTargetProvider(
 				$directoryPath,
 				$mapperClassNamePattern,
 			);
@@ -51,7 +51,7 @@ final readonly class StandaloneMapperCompiler
 		return new self(
 			MapperCompiler::create(true, false),
 			$objectMapperCompileInfoProvider,
-			new DefaultObjectMapperProvider(),
+			new RegistryClassMapperProvider(RegistryClassMapperProvider::createDefaultClassMappers())
 		);
 	}
 
@@ -62,12 +62,12 @@ final readonly class StandaloneMapperCompiler
 	 */
 	public function compile(string $className): string
 	{
-		$objectMapperToCompile = $this->objectMapperCompileInfoProvider->provide($className);
+		$objectMapperToCompile = $this->classMapperCompileTargetProvider->provide($className);
 		$this->compiler->compile(
 			$objectMapperToCompile,
 			new ObjectMapperCompilerContext(
-				$this->objectMapperCompileInfoProvider,
-				fn (ObjectMapperToCompile $objectMapperToCompile): bool => $this->objectMapperProvider->provide($objectMapperToCompile->className) !== null,
+				$this->classMapperCompileTargetProvider,
+				fn (ClassMapperToCompile $classMapperToCompile): bool => $this->classMapperProvider->provide($classMapperToCompile->className) === null,
 			),
 		);
 

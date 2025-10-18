@@ -41,6 +41,19 @@ final class BuiltInTest extends CompilerTestCase
 		], $properties);
 	}
 
+	public function testNullableUnionType(): void
+	{
+		$properties = $this->compileAnonymous(new class {
+			public int|null $int;
+			public int|float|string|bool|null $multiUnion;
+		});
+
+		$this->assertSame([
+			'int' => $this->requiredProperty('$ts->nullable($ts->int())'),
+			'multiUnion' => $this->requiredProperty('$ts->nullable($ts->union([$ts->string(), $ts->int(), $ts->float(), $ts->bool()]))'),
+		], $properties);
+	}
+
 	public function testNullableAndOptionalScalarTypes(): void
 	{
 		$properties = $this->compileAnonymous(new class {

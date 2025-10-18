@@ -6,7 +6,7 @@ final readonly class MethodNode implements TypeSchemaNode
 {
 
 	/**
-	 * @param list<TypeSchemaNode> $nodes
+	 * @param array<TypeSchemaNode> $nodes
 	 */
 	public function __construct(
 		public string $method,

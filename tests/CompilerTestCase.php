@@ -5,12 +5,13 @@ namespace Tests;
 use JetBrains\PhpStorm\Language;
 use Nette\PhpGenerator\PhpNamespace;
 use ReflectionClass;
+use Shredio\TypeSchema\Mapper\Jit\ClassMapperCompileHashedTargetProvider;
+use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompileHashedInfoProvider;
+use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaCodeFormatter;
 use Shredio\TypeSchemaCompiler\CompiledProperty;
 use Shredio\TypeSchemaCompiler\MapperCompiler;
 use Shredio\TypeSchemaCompiler\NamespaceResolver;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompileHashedInfoProvider;
-use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
 
 abstract class CompilerTestCase extends TestCase
 {
@@ -23,7 +24,7 @@ abstract class CompilerTestCase extends TestCase
 		$compiler = MapperCompiler::create();
 		$formatter = new TypeSchemaCodeFormatter(new NamespaceResolver(new PhpNamespace('TestNamespace')));
 		$properties = $compiler->compileOnlyProperties(new ReflectionClass($object), new ObjectMapperCompilerContext(
-			new ObjectMapperCompileHashedInfoProvider(__DIR__ . '/tmp', 'TestNamespace\\Mapper\\%s'),
+			new ClassMapperCompileHashedTargetProvider(__DIR__ . '/tmp', 'TestNamespace\\Mapper\\%s'),
 			fn () => false,
 		));
 		foreach ($properties as $property) {
