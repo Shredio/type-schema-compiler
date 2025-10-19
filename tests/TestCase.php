@@ -80,8 +80,8 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 
 		return new JustInTimeClassMapperProvider(
 			new ClassMapperCompileHashedTargetProvider(__DIR__ . '/Generated', 'Tests\\Generated\\%sMapper'),
-			new RegistryClassMapperProvider([...$classMappers, ...RegistryClassMapperProvider::createDefaultClassMappers()]),
 			MapperCompiler::create(true, false),
+			new RegistryClassMapperProvider([...$classMappers, ...RegistryClassMapperProvider::createDefaultClassMappers()]),
 		);
 	}
 

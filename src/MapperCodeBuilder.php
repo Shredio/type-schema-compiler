@@ -152,30 +152,42 @@ final readonly class MapperCodeBuilder
 	): bool
 	{
 		$constructorParameters = [];
-		$return = false;
+		$hasPropertiesToSet = false;
 		foreach ($properties as $property) {
 			if ($property->isInConstructor) {
 				$constructorParameters[$property->name] = true;
 			} else {
-				$return = true;
+				$hasPropertiesToSet = true;
 			}
 		}
 
 		$args = [];
 		if ($constructorParameters !== []) {
-			$expression = sprintf('new %s(...array_intersect_key($%s, ?))', $definition->mappedShortName, $valuesVar);
-			$args[] = $constructorParameters;
+			if (!$hasPropertiesToSet) {
+				$expression = sprintf(
+					'new %s(...$%s)',
+					$definition->mappedShortName,
+					$valuesVar
+				);
+			} else {
+				$expression = sprintf(
+					'new %s(...array_intersect_key($%s, ?))',
+					$definition->mappedShortName,
+					$valuesVar
+				);
+				$args[] = $constructorParameters;
+			}
 		} else {
 			$expression = sprintf('new %s()', $definition->mappedShortName);
 		}
 
-		if ($return) {
+		if ($hasPropertiesToSet) {
 			$method->addBody(sprintf('$? = %s;', $expression), [$objVar, ...$args]);
 		} else {
 			$method->addBody(sprintf('return %s;', $expression), $args);
 		}
 
-		return $return;
+		return $hasPropertiesToSet;
 	}
 
 	/**

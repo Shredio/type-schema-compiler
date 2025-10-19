@@ -4,6 +4,7 @@ namespace Shredio\TypeSchemaCompiler;
 
 use InvalidArgumentException;
 use Nette\PhpGenerator\Helpers;
+use Nette\Utils\FileSystem;
 use PHPStan\PhpDocParser\Ast\ConstExpr\ConstExprIntegerNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\ParamTagValueNode;
 use PHPStan\PhpDocParser\Ast\PhpDoc\PhpDocNode;
@@ -38,6 +39,7 @@ use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\NewClassNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaNode;
 use Shredio\TypeSchemaCompiler\Attribute\PropertyCompileOptions;
+use Shredio\TypeSchemaCompiler\Exception\CompileException;
 use Shredio\TypeSchemaCompiler\Helper\ReflectionHelper;
 use Shredio\TypeSchemaCompiler\Lock\FileLock;
 
@@ -47,16 +49,18 @@ final class MapperCompiler implements ClassMapperCompiler
 	/** @var array<class-string, bool> */
 	private array $compiled = [];
 
+	private bool $tempDirCreated = false;
+
 	public function __construct(
 		private readonly Lexer $phpDocLexer,
 		private readonly PhpDocParser $phpDocParser,
 		private readonly bool $autoRefresh = false,
-		private readonly bool $multiProcessSafe = true,
+		private readonly bool $multiProcessSafety = true,
 	)
 	{
 	}
 
-	public static function create(bool $autoRefresh = false, bool $multiProcessSafe = true): self
+	public static function create(bool $autoRefresh = false, bool $multiProcessSafety = true): self
 	{
 		$config = new ParserConfig([]);
 		$phpDocLexer = new Lexer($config);
@@ -67,7 +71,12 @@ final class MapperCompiler implements ClassMapperCompiler
 			$constExprParser,
 		);
 
-		return new self($phpDocLexer, $phpDocParser, $autoRefresh, $multiProcessSafe);
+		return new self($phpDocLexer, $phpDocParser, $autoRefresh, $multiProcessSafety);
+	}
+
+	public function withMultiProcessSafety(bool $enabled): static
+	{
+		return new self($this->phpDocLexer, $this->phpDocParser, $this->autoRefresh, $enabled);
 	}
 
 	public function compile(ClassMapperToCompile $objectMapperData, ObjectMapperCompilerContext $context): void
@@ -76,10 +85,34 @@ final class MapperCompiler implements ClassMapperCompiler
 			return;
 		}
 
+		if (!$this->tempDirCreated) {
+			$this->tempDirCreated = true;
+			$dir = dirname($objectMapperData->targetFilePath);
+			if (!is_dir($dir)) {
+				FileSystem::createDir($dir);
+			}
+		}
+
 		$this->compiled[$objectMapperData->className] = true;
 		$reflectionClass = new ReflectionClass($objectMapperData->className);
+		if (!$reflectionClass->isInstantiable()) {
+			if ($reflectionClass->isInterface()) {
+				throw new CompileException(sprintf('Cannot compile class mapper for interface %s.', $objectMapperData->className));
+			}
+			if ($reflectionClass->isTrait()) {
+				throw new CompileException(sprintf('Cannot compile class mapper for trait %s.', $objectMapperData->className));
+			}
+			if ($reflectionClass->isEnum()) {
+				throw new CompileException(sprintf('Cannot compile class mapper for enum %s.', $objectMapperData->className));
+			}
+			if ($reflectionClass->isAnonymous()) {
+				throw new CompileException(sprintf('Cannot compile class mapper for anonymous class %s.', $objectMapperData->className));
+			}
 
-		if ($this->multiProcessSafe) {
+			throw new CompileException(sprintf('Cannot compile class mapper for non-instantiable class %s.', $objectMapperData->className));
+		}
+
+		if ($this->multiProcessSafety) {
 			$transaction = (new FileLock($objectMapperData->targetFilePath))->transaction(...);
 		} else {
 			$transaction = fn (callable $callback): mixed => $callback();
