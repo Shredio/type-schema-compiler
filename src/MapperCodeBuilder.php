@@ -249,7 +249,7 @@ final readonly class MapperCodeBuilder
 		$definition->namespaceResolver->addUse(TypeNode::class);
 
 		$method = $definition->class->addMethod('getTypeNode')
-			->setPublic()
+			->setProtected()
 			->setReturnType(TypeNode::class);
 
 		$method->addParameter('context')
