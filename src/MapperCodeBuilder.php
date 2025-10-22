@@ -82,7 +82,6 @@ final readonly class MapperCodeBuilder
 
 	/**
 	 * @param array<string, CompiledProperty> $properties
-	 * @param ReflectionClass<object> $reflectionClass
 	 */
 	private function defineSchema(
 		Method $method,
