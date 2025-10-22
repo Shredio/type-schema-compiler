@@ -49,7 +49,7 @@ final readonly class Person2Mapper_c77dbf479d extends Type
 	}
 
 
-	public function getTypeNode(TypeContext $context): TypeNode
+	protected function getTypeNode(TypeContext $context): TypeNode
 	{
 		return new IdentifierTypeNode(Person2::class);
 	}

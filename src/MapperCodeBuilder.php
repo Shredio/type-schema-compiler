@@ -16,6 +16,7 @@ use Shredio\TypeSchemaCompiler\Ast\TypeSchema\DumpNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaCodeFormatter;
 use Shredio\TypeSchemaCompiler\Attribute\CompileObjectMapper;
+use Shredio\TypeSchemaCompiler\Context\CompileContext;
 
 final readonly class MapperCodeBuilder
 {
@@ -45,19 +46,23 @@ final readonly class MapperCodeBuilder
 	private function buildParse(ClassDefinition $definition, array $properties, ReflectionClass $reflectionClass): void
 	{
 		$parseMethod = $this->createParseMethod($definition);
+		$context = new CompileContext(
+			sourceClassName: $reflectionClass->getName(),
+			attribute: ($reflectionClass->getAttributes(CompileObjectMapper::class)[0] ?? null)?->newInstance() ?? new CompileObjectMapper(),
+		);
 
 		$this->section($parseMethod, '0. Initialize TypeSchema');
 		$this->initializeTypeSchema($parseMethod, $definition, 'ts');
 
 		$this->section($parseMethod, '1. Define schema', 1);
-		$this->defineSchema($parseMethod, $definition, $properties, $reflectionClass, 'ts', 'schema');
+		$this->defineSchema($parseMethod, $definition, $properties, $context, 'ts', 'schema');
 
 		$this->section($parseMethod, '2. Map values', 1);
 		$this->mapValues($parseMethod, 'schema', 'values');
 		$this->returnOnError($parseMethod, 'values');
 
 		$this->section($parseMethod, '3. Create a new instance', 1);
-		$continue = $this->createNewInstance($parseMethod, $definition, $properties, 'values', 'obj');
+		$continue = $this->createNewInstance($parseMethod, $definition, $properties, $context, 'values', 'obj');
 
 		if (!$continue) {
 			return;
@@ -83,7 +88,7 @@ final readonly class MapperCodeBuilder
 		Method $method,
 		ClassDefinition $definition,
 		array $properties,
-		ReflectionClass $reflectionClass,
+		CompileContext $context,
 		string $typeSchemaVar,
 		string $schemaVar,
 	): void
@@ -92,14 +97,12 @@ final readonly class MapperCodeBuilder
 			fn (CompiledProperty $property) => $property->typeSchemaNode,
 			$properties,
 		);
-		/** @var CompileObjectMapper|null $attribute */
-		$attribute = ($reflectionClass->getAttributes(CompileObjectMapper::class)[0] ?? null)?->newInstance();
-		$identifier = $attribute?->identifier;
+		$identifier = $context->attribute->identifier;
 
 		$nodes = [new ArrayNode($nodes, true)];
 		if ($identifier !== null) {
 			if (!isset($properties[$identifier])) {
-				throw new \LogicException(sprintf('Identifier property "%s" not found in class %s.', $identifier, $reflectionClass->getName()));
+				throw new \LogicException(sprintf('Identifier property "%s" not found in class %s.', $identifier, $context->sourceClassName));
 			}
 
 			$nodes['identifier'] = new DumpNode($identifier);
@@ -147,6 +150,7 @@ final readonly class MapperCodeBuilder
 		Method $method,
 		ClassDefinition $definition,
 		array $properties,
+		CompileContext $context,
 		string $valuesVar,
 		string $objVar,
 	): bool
@@ -163,7 +167,7 @@ final readonly class MapperCodeBuilder
 
 		$args = [];
 		if ($constructorParameters !== []) {
-			if (!$hasPropertiesToSet) {
+			if (!$hasPropertiesToSet && !$context->attribute->discardExtraItems) {
 				$expression = sprintf(
 					'new %s(...$%s)',
 					$definition->mappedShortName,

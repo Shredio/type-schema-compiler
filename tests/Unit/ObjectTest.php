@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use Shredio\TypeSchemaCompiler\Attribute\CompileObjectMapper;
 use Tests\TestCase;
 
 final class ObjectTest extends TestCase
@@ -48,6 +49,16 @@ final class ObjectTest extends TestCase
 		$this->assertCreatedMapperCount(1); // Address has no nested objects
 	}
 
+	public function testAddressDiscardExtraItemsCompile(): void
+	{
+		$this->assertCompiledSameAsFile(
+			__DIR__ . '/expected/object/AddressDiscardExtraItemsMapper.php',
+			AddressDiscardExtraItems::class,
+		);
+
+		$this->assertCreatedMapperCount(1); // Address has no nested objects
+	}
+
 }
 
 class Person
@@ -75,4 +86,16 @@ class Address
 {
 	public string $street;
 	public string $city;
+}
+
+#[CompileObjectMapper(discardExtraItems: true)]
+class AddressDiscardExtraItems
+{
+	public function __construct(
+		public string $city,
+		public string $street,
+	)
+	{
+	}
+
 }
