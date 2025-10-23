@@ -51,6 +51,8 @@ final class MapperCompiler implements ClassMapperCompiler
 
 	private bool $tempDirCreated = false;
 
+	private bool $validationMode = false;
+
 	public function __construct(
 		private readonly Lexer $phpDocLexer,
 		private readonly PhpDocParser $phpDocParser,
@@ -79,13 +81,22 @@ final class MapperCompiler implements ClassMapperCompiler
 		return new self($this->phpDocLexer, $this->phpDocParser, $this->autoRefresh, $enabled);
 	}
 
+
+	public function withValidationMode(): static
+	{
+		$self = new self($this->phpDocLexer, $this->phpDocParser, true, false);
+		$self->validationMode = true;
+
+		return $self;
+	}
+
 	public function compile(ClassMapperToCompile $objectMapperData, ObjectMapperCompilerContext $context): void
 	{
 		if (isset($this->compiled[$objectMapperData->className])) {
 			return;
 		}
 
-		if (!$this->tempDirCreated) {
+		if (!$this->tempDirCreated && !$this->validationMode) {
 			$this->tempDirCreated = true;
 			$dir = dirname($objectMapperData->targetFilePath);
 			if (!is_dir($dir)) {
@@ -120,8 +131,12 @@ final class MapperCompiler implements ClassMapperCompiler
 
 		$transaction(function () use ($context, $objectMapperData, $reflectionClass): void {
 			$code = $this->getCode($reflectionClass, $objectMapperData->mapperClassName, $context);
-			$path = $objectMapperData->targetFilePath;
 
+			if ($this->validationMode) {
+				return;
+			}
+
+			$path = $objectMapperData->targetFilePath;
 			if (file_put_contents("$path.tmp", $code) !== strlen($code) || !rename("$path.tmp", $path)) {
 				@unlink("$path.tmp"); // @ file may not exist
 				throw new RuntimeException("Unable to create '$path'.");
