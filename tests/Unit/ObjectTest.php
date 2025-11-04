@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use Shredio\TypeSchemaCompiler\Attribute\CompileObjectMapper;
+use Shredio\TypeSchemaCompiler\Attribute\CompilePropertyOptions;
 use Tests\TestCase;
 
 final class ObjectTest extends TestCase
@@ -59,6 +60,16 @@ final class ObjectTest extends TestCase
 		$this->assertCreatedMapperCount(1); // Address has no nested objects
 	}
 
+	public function testCompileAsObjectType(): void
+	{
+		$this->assertCompiledSameAsFile(
+			__DIR__ . '/expected/object/CompileAsObjectType.php',
+			CompileAsObjectType::class,
+		);
+
+		$this->assertCreatedMapperCount(1);
+	}
+
 }
 
 class Person
@@ -94,6 +105,23 @@ class AddressDiscardExtraItems
 	public function __construct(
 		public string $city,
 		public string $street,
+	)
+	{
+	}
+
+}
+
+class CompileAsObjectType {
+
+	public function __construct(
+		#[CompilePropertyOptions(compileAsObjectType: true)]
+		public Address $address,
+		#[CompilePropertyOptions(compileAsObjectType: true)]
+		public Address|string $unionBuiltIn,
+		#[CompilePropertyOptions(compileAsObjectType: true)]
+		public Address|Person $union,
+		#[CompilePropertyOptions(compileAsObjectType: true)]
+		public ?Address $nullableAddress = null,
 	)
 	{
 	}

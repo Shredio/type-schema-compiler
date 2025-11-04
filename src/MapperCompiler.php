@@ -38,7 +38,7 @@ use Shredio\TypeSchemaCompiler\Ast\TypeSchema\DumpNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\NewClassNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaNode;
-use Shredio\TypeSchemaCompiler\Attribute\PropertyCompileOptions;
+use Shredio\TypeSchemaCompiler\Attribute\CompilePropertyOptions;
 use Shredio\TypeSchemaCompiler\Exception\CompileException;
 use Shredio\TypeSchemaCompiler\Helper\ReflectionHelper;
 use Shredio\TypeSchemaCompiler\Lock\FileLock;
@@ -217,7 +217,7 @@ final class MapperCompiler implements ClassMapperCompiler
 		return $properties;
 	}
 
-	private function isParameterOptional(ReflectionParameter $parameter, PropertyCompileOptions $options): bool
+	private function isParameterOptional(ReflectionParameter $parameter, CompilePropertyOptions $options): bool
 	{
 		if (is_bool($options->optional)) {
 			return $options->optional;
@@ -226,7 +226,7 @@ final class MapperCompiler implements ClassMapperCompiler
 		return $parameter->isOptional();
 	}
 
-	private function isPropertyOptional(ReflectionProperty $property, PropertyCompileOptions $options): bool
+	private function isPropertyOptional(ReflectionProperty $property, CompilePropertyOptions $options): bool
 	{
 		if (is_bool($options->optional)) {
 			return $options->optional;
@@ -235,14 +235,14 @@ final class MapperCompiler implements ClassMapperCompiler
 		return $property->hasDefaultValue();
 	}
 
-	private function getPropertyOptionsAttribute(ReflectionParameter|ReflectionProperty $reflection): PropertyCompileOptions
+	private function getPropertyOptionsAttribute(ReflectionParameter|ReflectionProperty $reflection): CompilePropertyOptions
 	{
-		$attribute = $reflection->getAttributes(PropertyCompileOptions::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
+		$attribute = $reflection->getAttributes(CompilePropertyOptions::class, ReflectionAttribute::IS_INSTANCEOF)[0] ?? null;
 		if ($attribute === null) {
-			return new PropertyCompileOptions();
+			return new CompilePropertyOptions();
 		}
 
-		/** @var PropertyCompileOptions */
+		/** @var CompilePropertyOptions */
 		return $attribute->newInstance();
 	}
 
@@ -304,16 +304,20 @@ final class MapperCompiler implements ClassMapperCompiler
 	/**
 	 * @param class-string $className
 	 */
-	private function createForInnerClass(string $className, ObjectMapperCompilerContext $context): TypeSchemaNode
+	private function createForInnerClass(string $className, CompilePropertyOptions $options, ObjectMapperCompilerContext $context): TypeSchemaNode
 	{
-		$ClassMapperToCompile = $context->createClassMapperToCompile($className);
-		if ($context->hasProviderFor($ClassMapperToCompile)) {
+		if ($options->compileAsObjectType) {
+			return new MethodNode('object', [new ClassNameNode($className)]);
+		}
+
+		$classMapperToCompile = $context->createClassMapperToCompile($className);
+		if ($context->hasProviderFor($classMapperToCompile)) {
 			return new MethodNode('mapper', [new ClassNameNode($className)]);
 		}
 
-		$this->compile($ClassMapperToCompile, $context);
+		$this->compile($classMapperToCompile, $context);
 
-		return new NewClassNode($ClassMapperToCompile->mapperClassName);
+		return new NewClassNode($classMapperToCompile->mapperClassName);
 	}
 
 	private function parsePhpDoc(string $docComment): PhpDocNode
@@ -330,7 +334,7 @@ final class MapperCompiler implements ClassMapperCompiler
 		ReflectionClass $reflectionClass,
 		ReflectionParameter|ReflectionProperty $reflection,
 		array $docTypes,
-		PropertyCompileOptions $options,
+		CompilePropertyOptions $options,
 		ObjectMapperCompilerContext $context,
 	): TypeSchemaNode
 	{
@@ -348,7 +352,7 @@ final class MapperCompiler implements ClassMapperCompiler
 		return $this->createFromTypeNode($typeNode, $options, $context);
 	}
 
-	private function createFromTypeNode(TypeNode $typeNode, PropertyCompileOptions $options, ObjectMapperCompilerContext $context): TypeSchemaNode
+	private function createFromTypeNode(TypeNode $typeNode, CompilePropertyOptions $options, ObjectMapperCompilerContext $context): TypeSchemaNode
 	{
 		$typeNode = $this->normalizeType($typeNode);
 
@@ -358,7 +362,7 @@ final class MapperCompiler implements ClassMapperCompiler
 					throw new InvalidArgumentException("Class or interface '{$typeNode->name}' does not exist.");
 				}
 
-				return $this->createForInnerClass($typeNode->name, $context);
+				return $this->createForInnerClass($typeNode->name, $options, $context);
 			}
 
 			return match ($typeNode->name) {
