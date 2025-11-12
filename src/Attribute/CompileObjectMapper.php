@@ -14,6 +14,7 @@ final readonly class CompileObjectMapper
 	public function __construct(
 		public ?string $identifier = null,
 		public bool $discardExtraItems = false,
+		public ?string $contextFactory = null,
 	)
 	{
 	}

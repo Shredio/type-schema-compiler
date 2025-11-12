@@ -8,6 +8,9 @@ use Nette\PhpGenerator\Printer;
 use PHPStan\PhpDocParser\Ast\Type\IdentifierTypeNode;
 use PHPStan\PhpDocParser\Ast\Type\TypeNode;
 use ReflectionClass;
+use ReflectionMethod;
+use ReflectionNamedType;
+use ReflectionType;
 use Shredio\TypeSchema\Context\TypeContext;
 use Shredio\TypeSchema\Error\ErrorElement;
 use Shredio\TypeSchema\TypeSchema;
@@ -50,6 +53,8 @@ final readonly class MapperCodeBuilder
 			sourceClassName: $reflectionClass->getName(),
 			attribute: ($reflectionClass->getAttributes(CompileObjectMapper::class)[0] ?? null)?->newInstance() ?? new CompileObjectMapper(),
 		);
+
+		$this->initializeMethod($parseMethod, $definition, $context);
 
 		$this->section($parseMethod, '0. Initialize TypeSchema');
 		$this->initializeTypeSchema($parseMethod, $definition, 'ts');
@@ -130,6 +135,49 @@ final readonly class MapperCodeBuilder
 			->setType(TypeContext::class);
 
 		return $method;
+	}
+
+	private function initializeMethod(Method $method, ClassDefinition $definition, CompileContext $context): void
+	{
+		if ($context->attribute->contextFactory !== null) {
+			$this->addContextFactory($method, $definition, $context->sourceClassName, $context->attribute->contextFactory);
+		}
+	}
+
+	private function addContextFactory(Method $method, ClassDefinition $definition, string $className, string $methodName): void
+	{
+		$reflectionMethod = new ReflectionMethod($className, $methodName);
+		if (!$reflectionMethod->isStatic() || !$reflectionMethod->isPublic()) {
+			throw new \LogicException(sprintf('Context factory method %s::%s must be public static.', $className, $methodName));
+		}
+
+		// Check parameters
+		$parameters = $reflectionMethod->getParameters();
+		if (count($parameters) > 1) {
+			throw new \LogicException(sprintf('Context factory method %s::%s must have zero or one parameter ($context).', $className, $methodName));
+		}
+
+		if (isset($parameters[0])) {
+			$parameter = $parameters[0];
+			$type = $parameter->getType();
+			if (!$type instanceof ReflectionNamedType || $type->getName() !== TypeContext::class) {
+				throw new \LogicException(sprintf('Parameter $context of context factory method %s::%s must be of type %s.', $className, $methodName, TypeContext::class));
+			}
+		}
+
+		// Check return type
+		$returnType = $reflectionMethod->getReturnType();
+		if (!$returnType instanceof ReflectionNamedType || $returnType->getName() !== TypeContext::class) {
+			throw new \LogicException(sprintf('Return type of context factory method %s::%s must be of type %s.', $className, $methodName, TypeContext::class));
+		}
+
+		$method->addBody(sprintf(
+			'$context = %s::%s(%s);',
+			$definition->namespaceResolver->shortName($className),
+			$methodName,
+			count($parameters) === 1 ? '$context' : '',
+		));
+		$method->addBody('');
 	}
 
 	private function initializeTypeSchema(Method $method, ClassDefinition $definition, string $typeSchemaVar): void
