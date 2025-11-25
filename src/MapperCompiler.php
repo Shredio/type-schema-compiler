@@ -33,6 +33,7 @@ use Shredio\TypeSchema\Mapper\Jit\ClassMapperToCompile;
 use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
 use Shredio\TypeSchema\TypeSystem\TypeNodeHelper;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ArrayNode;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\CallbackNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ClassNameNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\DumpNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
@@ -349,7 +350,15 @@ final class MapperCompiler implements ClassMapperCompiler
 			}
 		}
 
-		return $this->createFromTypeNode($typeNode, $options, $context);
+		$typeSchemaNode = $this->createFromTypeNode($typeNode, $options, $context);
+		if ($options->before !== null) {
+			$typeSchemaNode = new MethodNode('before', [
+				new CallbackNode($options->before),
+				$typeSchemaNode,
+			]);
+		}
+
+		return $typeSchemaNode;
 	}
 
 	private function createFromTypeNode(TypeNode $typeNode, CompilePropertyOptions $options, ObjectMapperCompilerContext $context): TypeSchemaNode

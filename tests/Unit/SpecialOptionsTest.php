@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use Shredio\TypeSchema\Context\TypeContext;
 use Shredio\TypeSchemaCompiler\Attribute\CompileObjectMapper;
+use Shredio\TypeSchemaCompiler\Attribute\CompilePropertyOptions;
 use Tests\CompilerTestCase;
 
 final class SpecialOptionsTest extends CompilerTestCase
@@ -19,6 +20,16 @@ final class SpecialOptionsTest extends CompilerTestCase
 		$this->assertCreatedMapperCount(1);
 	}
 
+	public function testPropertyBefore(): void
+	{
+		$this->assertCompiledSameAsFile(
+			__DIR__ . '/expected/special-options/PropertyBefore.php',
+			PropertyBefore::class,
+		);
+
+		$this->assertCreatedMapperCount(1);
+	}
+
 }
 
 #[CompileObjectMapper(contextFactory: 'createContext')]
@@ -29,6 +40,23 @@ class ContextFactory
 	public static function createContext(TypeContext $context): TypeContext
 	{
 		return $context;
+	}
+
+}
+
+class PropertyBefore
+{
+
+	#[CompilePropertyOptions(before: [PropertyBefore::class, 'handleNan'])]
+	public float $value;
+
+	public static function handleNan(mixed $valueToParse, TypeContext $context): mixed
+	{
+		if (is_float($valueToParse) && is_nan($valueToParse)) {
+			return 0.0;
+		}
+
+		return $valueToParse;
 	}
 
 }

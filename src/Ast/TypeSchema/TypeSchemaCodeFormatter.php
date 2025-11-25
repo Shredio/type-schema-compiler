@@ -35,6 +35,15 @@ final readonly class TypeSchemaCodeFormatter
 			return $node->value;
 		}
 
+		if ($node instanceof CallbackNode) {
+			if ($node->class !== null) {
+				$shortClassName = $this->namespaceResolver->shortName($node->class);
+				return $this->dumper->format('?::?(...)', new Literal($shortClassName), $node->method);
+			} else {
+				return $this->dumper->format('?(...)', $node->method);
+			}
+		}
+
 		if ($node instanceof ArrayNode) {
 			$items = $node->items;
 			foreach ($items as $key => $item) {
