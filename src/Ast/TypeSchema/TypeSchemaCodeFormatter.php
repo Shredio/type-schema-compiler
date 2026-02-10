@@ -27,6 +27,13 @@ final readonly class TypeSchemaCodeFormatter
 			);
 		}
 
+		if ($node instanceof MethodChainNode) {
+			return $this->format($node->parent) . $this->dumper->format(
+				'->?(...?:)',
+				$node->method, $this->formatNodes($node->nodes),
+			);
+		}
+
 		if ($node instanceof DumpNode) {
 			return $this->dumper->dump($node->value);
 		}
@@ -64,7 +71,12 @@ final readonly class TypeSchemaCodeFormatter
 
 		if ($node instanceof NewClassNode) {
 			$shortClassName = $this->namespaceResolver->shortName($node->className);
-			return $this->dumper->format('new ?()', new Literal($shortClassName));
+
+			if ($node->arguments === []) {
+				return $this->dumper->format('new ?()', new Literal($shortClassName));
+			} else {
+				return $this->dumper->format('new ?(...?:)', new Literal($shortClassName), $this->formatNodes($node->arguments));
+			}
 		}
 
 		throw new \LogicException('Unsupported node type: ' . $node::class);

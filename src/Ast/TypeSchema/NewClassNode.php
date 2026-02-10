@@ -7,9 +7,11 @@ final readonly class NewClassNode implements TypeSchemaNode
 
 	/**
 	 * @param class-string $className
+	 * @param array<TypeSchemaNode> $arguments
 	 */
 	public function __construct(
 		public string $className,
+		public array $arguments = [],
 	)
 	{
 	}

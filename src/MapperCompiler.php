@@ -31,11 +31,13 @@ use RuntimeException;
 use Shredio\TypeSchema\Mapper\Jit\ClassMapperCompiler;
 use Shredio\TypeSchema\Mapper\Jit\ClassMapperToCompile;
 use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
+use Shredio\TypeSchema\Symfony\SymfonyPropertyConstraints;
 use Shredio\TypeSchema\TypeSystem\TypeNodeHelper;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ArrayNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\CallbackNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ClassNameNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\DumpNode;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodChainNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\NewClassNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\TypeSchemaNode;
@@ -43,6 +45,7 @@ use Shredio\TypeSchemaCompiler\Attribute\CompilePropertyOptions;
 use Shredio\TypeSchemaCompiler\Exception\CompileException;
 use Shredio\TypeSchemaCompiler\Helper\ReflectionHelper;
 use Shredio\TypeSchemaCompiler\Lock\FileLock;
+use Symfony\Component\Validator\Constraint;
 
 final class MapperCompiler implements ClassMapperCompiler
 {
@@ -184,6 +187,14 @@ final class MapperCompiler implements ClassMapperCompiler
 		foreach (ReflectionHelper::getConstructorParameters($reflectionClass) as $parameter) {
 			$options = $this->getPropertyOptionsAttribute($parameter);
 			$typeNode = $this->compileType($reflectionClass, $parameter, $docTypes, $options, $context);
+
+			if (($attributes = $parameter->getAttributes()) !== []) {
+				$declaringClass = $parameter->getDeclaringClass();
+				if ($declaringClass !== null) {
+					$typeNode = $this->createValidationRules($typeNode, $attributes, $declaringClass->getName(), $parameter->getName());
+				}
+			}
+
 			if ($isOptional = $this->isParameterOptional($parameter, $options)) {
 				$typeNode = $this->createOptionalProperty($typeNode);
 			}
@@ -518,6 +529,23 @@ final class MapperCompiler implements ClassMapperCompiler
 		}
 
 		return $type;
+	}
+
+	/**
+	 * @param array<ReflectionAttribute<object>> $attributes
+	 * @param class-string $className
+	 */
+	private function createValidationRules(TypeSchemaNode $typeNode, array $attributes, string $className, string $propertyName): TypeSchemaNode
+	{
+		foreach ($attributes as $attribute) {
+			if (is_a($attribute->getName(), Constraint::class, true)) {
+				return new MethodChainNode($typeNode, 'validate', [
+					new NewClassNode(SymfonyPropertyConstraints::class, [new ClassNameNode($className), new DumpNode($propertyName)])
+				]);
+			}
+		}
+
+		return $typeNode;
 	}
 
 }

@@ -7,7 +7,7 @@
 		"phpstan/phpdoc-parser": "^2.3",
 		"nette/utils": "^4.0",
 		"nette/php-generator": "^4.2",
-		"shredio/type-schema": "^0.9.11"
+		"shredio/type-schema": "^0.9.28"
 	},
 	"autoload": {
 		"psr-4": {
@@ -30,6 +30,7 @@
 		"symfony/http-kernel": "^7.3",
 		"symfony/dependency-injection": "^7.3",
 		"symfony/config": "^7.3",
-		"symfony/console": "^7.3"
+		"symfony/console": "^7.3",
+		"symfony/validator": "^8.0"
 	}
 }

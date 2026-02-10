@@ -88,8 +88,12 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 	/**
 	 * @param class-string $className
 	 */
-	protected function assertCompiledSameAsFile(string $expectedFile, string $className): void
+	protected function assertCompiledSameAsFile(string $expectedFile, string $className, bool $recreate = false): void
 	{
+		if ($recreate) {
+			file_put_contents($expectedFile, $this->compile($className));
+		}
+
 		$this->assertStringEqualsFile($expectedFile, $this->compile($className));
 	}
 
