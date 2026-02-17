@@ -13,11 +13,13 @@ final readonly class CompilePropertyOptions
 	public mixed $before;
 
 	/**
+	 * @param non-empty-string|null $name The name of the property in the source data (e.g. JSON key). If null, the property name will be used.
 	 * @param list<mixed> $nullValues Values that should be treated as null when mapping
 	 * @param bool $compileAsObjectType Whether to compile the property as an ObjectType instead of MapperType
 	 * @param (callable(mixed $valueToParse, TypeContext $context): mixed)|null $before A callback to process the value before mapping
 	 */
 	public function __construct(
+		public ?string $name = null,
 		public ?bool $optional = null,
 		public array $nullValues = [],
 		public bool $compileAsObjectType = false,

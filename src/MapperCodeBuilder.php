@@ -66,14 +66,25 @@ final readonly class MapperCodeBuilder
 		$this->mapValues($parseMethod, 'schema', 'values');
 		$this->returnOnError($parseMethod, 'values');
 
-		$this->section($parseMethod, '3. Create a new instance', 1);
+		$sectionNumber = 3;
+		$propertiesToReindex = $this->getPropertiesToReindex($properties);
+		if ($propertiesToReindex !== []) {
+			$this->section($parseMethod, '3. Reindex values', 1);
+			$this->reindexValues($parseMethod, $propertiesToReindex, 'values');
+
+			$sectionNumber++;
+		}
+
+		$this->section($parseMethod, sprintf('%d. Create a new instance', $sectionNumber), 1);
 		$continue = $this->createNewInstance($parseMethod, $definition, $properties, $context, 'values', 'obj');
+
+		$sectionNumber++;
 
 		if (!$continue) {
 			return;
 		}
 
-		$this->section($parseMethod, '4. Set properties', 1);
+		$this->section($parseMethod, sprintf('%d. Set properties', $sectionNumber), 1);
 		$this->setProperties($parseMethod, $properties, 'obj', 'values');
 	}
 
@@ -97,10 +108,14 @@ final readonly class MapperCodeBuilder
 		string $schemaVar,
 	): void
 	{
-		$nodes = array_map(
-			fn (CompiledProperty $property) => $property->typeSchemaNode,
-			$properties,
-		);
+		$nodes = [];
+		foreach ($properties as $property) {
+			$nodes[$property->sourceName] = $property->typeSchemaNode;
+		}
+//		$nodes = array_map(
+//			fn (CompiledProperty $property) => $property->typeSchemaNode,
+//			$properties,
+//		);
 		$identifier = $context->attribute->identifier;
 
 		$nodes = [new ArrayNode($nodes, true)];
@@ -188,6 +203,60 @@ final readonly class MapperCodeBuilder
 	private function mapValues(Method $method, string $schemaVar, string $valuesVar): void
 	{
 		$method->addBody('$? = $?->parse($valueToParse, $context);', [$valuesVar, $schemaVar]);
+	}
+
+	/**
+	 * @param non-empty-array<string, CompiledProperty> $properties
+	 */
+	private function reindexValues(Method $method, array $properties, string $valuesVar): void
+	{
+		$lastKey = array_key_last($properties);
+
+		foreach ($properties as $key => $property) {
+			if ($property->isRequired) {
+				$method->addBody('$?[?] = $?[?];', [
+					$valuesVar,
+					$property->name,
+					$valuesVar,
+					$property->sourceName,
+				]);
+				$method->addBody('unset($?[?]);', [
+					$valuesVar,
+					$property->sourceName,
+				]);
+			} else {
+				$method->addBody('if (array_key_exists(?, $?)) {', [
+					$property->sourceName,
+					$valuesVar,
+				]);
+
+				$method->addBody("\t\$?[?] = \$?[?];", [
+					$valuesVar,
+					$property->name,
+					$valuesVar,
+					$property->sourceName,
+				]);
+				$method->addBody("\tunset(\$?[?]);", [
+					$valuesVar,
+					$property->sourceName,
+				]);
+
+				$method->addBody('}');
+			}
+
+			if ($key !== $lastKey) {
+				$method->addBody('');
+			}
+		}
+	}
+
+	/**
+	 * @param array<string, CompiledProperty> $properties
+	 * @return array<string, CompiledProperty>
+	 */
+	private function getPropertiesToReindex(array $properties): array
+	{
+		return array_filter($properties, static fn (CompiledProperty $property): bool => $property->name !== $property->sourceName);
 	}
 
 	/**

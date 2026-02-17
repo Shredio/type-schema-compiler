@@ -201,6 +201,7 @@ final class MapperCompiler implements ClassMapperCompiler
 
 			$properties[$parameter->getName()] = new CompiledProperty(
 				$parameter->getName(),
+				$options->name ?? $parameter->getName(),
 				true,
 				!$isOptional,
 				$typeNode,
@@ -220,6 +221,7 @@ final class MapperCompiler implements ClassMapperCompiler
 
 			$properties[$property->getName()] = new CompiledProperty(
 				$property->getName(),
+				$options->name ?? $property->getName(),
 				false,
 				!$isOptional,
 				$typeNode,

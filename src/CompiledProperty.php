@@ -9,6 +9,7 @@ final readonly class CompiledProperty
 
 	public function __construct(
 		public string $name,
+		public string $sourceName,
 		public bool $isInConstructor,
 		public bool $isRequired,
 		public TypeSchemaNode $typeSchemaNode,

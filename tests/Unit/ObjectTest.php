@@ -70,6 +70,16 @@ final class ObjectTest extends TestCase
 		$this->assertCreatedMapperCount(1);
 	}
 
+	public function testReindexObjectCompile(): void
+	{
+		$this->assertCompiledSameAsFile(
+			__DIR__ . '/expected/object/ReindexObjectMapper.php',
+			ReindexObject::class,
+		);
+
+		$this->assertCreatedMapperCount(1);
+	}
+
 }
 
 class Person
@@ -122,6 +132,26 @@ class CompileAsObjectType {
 		public Address|Person $union,
 		#[CompilePropertyOptions(compileAsObjectType: true)]
 		public ?Address $nullableAddress = null,
+	)
+	{
+	}
+
+}
+
+class ReindexObject
+{
+
+	#[CompilePropertyOptions(name: 'good_will')]
+	public ?float $goodWill;
+
+	#[CompilePropertyOptions(name: 'other_assets')]
+	public ?float $otherAssets = null;
+
+	public function __construct(
+		#[CompilePropertyOptions(name: 'currency_code')]
+		public string $currencyCode,
+		#[CompilePropertyOptions(name: 'earning_assets')]
+		public ?float $earningAssets = null,
 	)
 	{
 	}
