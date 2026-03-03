@@ -79,6 +79,12 @@ final readonly class TypeSchemaCodeFormatter
 			}
 		}
 
+		if ($node instanceof EnumCaseNode) {
+			$shortClassName = $this->namespaceResolver->shortName($node->className);
+
+			return $this->dumper->format('?::?', new Literal($shortClassName), $node->caseName);
+		}
+
 		throw new \LogicException('Unsupported node type: ' . $node::class);
 	}
 

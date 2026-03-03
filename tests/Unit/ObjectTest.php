@@ -2,8 +2,12 @@
 
 namespace Tests\Unit;
 
+use Shredio\TypeSchema\Conversion\Converter\Bool\LenientBoolConverter;
+use Shredio\TypeSchema\Conversion\Converter\Number\LenientNumberConverter;
+use Shredio\TypeSchema\Conversion\Converter\String\StrictStringConverter;
 use Shredio\TypeSchemaCompiler\Attribute\CompileObjectMapper;
 use Shredio\TypeSchemaCompiler\Attribute\CompilePropertyOptions;
+use Shredio\TypeSchemaCompiler\Attribute\TypeConverters;
 use Tests\TestCase;
 
 final class ObjectTest extends TestCase
@@ -79,6 +83,33 @@ final class ObjectTest extends TestCase
 
 		$this->assertCreatedMapperCount(1);
 	}
+
+	public function testTypeConverters(): void
+	{
+		$this->assertCompiledSameAsFile(
+			__DIR__ . '/expected/object/CustomTypeConverters.php',
+			CustomTypeConverters::class,
+		);
+
+		$this->assertCreatedMapperCount(1);
+	}
+
+}
+
+class CustomTypeConverters
+{
+
+	#[CompilePropertyOptions(typeConverters: new TypeConverters(string: new StrictStringConverter()))]
+	public ?string $string;
+
+	#[CompilePropertyOptions(typeConverters: new TypeConverters(float: new LenientNumberConverter()))]
+	public float $float;
+
+	#[CompilePropertyOptions(typeConverters: new TypeConverters(int: new LenientNumberConverter(roundingMode: \RoundingMode::HalfAwayFromZero)))]
+	public int $int;
+
+	#[CompilePropertyOptions(typeConverters: new TypeConverters(bool: new LenientBoolConverter(['yes'], ['no'])))]
+	public bool $bool;
 
 }
 

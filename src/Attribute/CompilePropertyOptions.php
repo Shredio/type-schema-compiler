@@ -23,6 +23,7 @@ final readonly class CompilePropertyOptions
 		public ?bool $optional = null,
 		public array $nullValues = [],
 		public bool $compileAsObjectType = false,
+		public ?TypeConverters $typeConverters = null,
 		?callable $before = null,
 	)
 	{

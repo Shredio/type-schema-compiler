@@ -28,6 +28,7 @@ use ReflectionClass;
 use ReflectionParameter;
 use ReflectionProperty;
 use RuntimeException;
+use Shredio\TypeSchema\Conversion\Converter\ConstructableConverter;
 use Shredio\TypeSchema\Mapper\Jit\ClassMapperCompiler;
 use Shredio\TypeSchema\Mapper\Jit\ClassMapperToCompile;
 use Shredio\TypeSchema\Mapper\Jit\ObjectMapperCompilerContext;
@@ -37,6 +38,7 @@ use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ArrayNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\CallbackNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\ClassNameNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\DumpNode;
+use Shredio\TypeSchemaCompiler\Ast\TypeSchema\EnumCaseNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodChainNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\MethodNode;
 use Shredio\TypeSchemaCompiler\Ast\TypeSchema\NewClassNode;
@@ -46,6 +48,7 @@ use Shredio\TypeSchemaCompiler\Exception\CompileException;
 use Shredio\TypeSchemaCompiler\Helper\ReflectionHelper;
 use Shredio\TypeSchemaCompiler\Lock\FileLock;
 use Symfony\Component\Validator\Constraint;
+use UnitEnum;
 
 final class MapperCompiler implements ClassMapperCompiler
 {
@@ -371,6 +374,13 @@ final class MapperCompiler implements ClassMapperCompiler
 			]);
 		}
 
+		if ($options->typeConverters !== null) {
+			$converters = $options->typeConverters->toArray();
+			if ($converters !== []) {
+				$typeSchemaNode = new MethodChainNode($typeSchemaNode, 'conversion', $this->conversionArguments($converters));
+			}
+		}
+
 		return $typeSchemaNode;
 	}
 
@@ -548,6 +558,48 @@ final class MapperCompiler implements ClassMapperCompiler
 		}
 
 		return $typeNode;
+	}
+
+	/**
+	 * @param array<non-empty-string, ConstructableConverter> $converters
+	 * @return array<non-empty-string, TypeSchemaNode>
+	 */
+	private function conversionArguments(array $converters): array
+	{
+		return array_map(
+			fn (ConstructableConverter $converter): NewClassNode => new NewClassNode($converter::class, $this->processConstructorArguments($converter->constructorArguments())),
+			$converters,
+		);
+	}
+
+	/**
+	 * @param list<scalar|UnitEnum|null|array<array-key, scalar|UnitEnum|null>> $arguments
+	 * @return list<TypeSchemaNode>
+	 */
+	private function processConstructorArguments(array $arguments): array
+	{
+		if ($arguments === []) {
+			return [];
+		}
+
+		$newArguments = [];
+		foreach ($arguments as $argument) {
+			if (is_scalar($argument) || $argument === null) {
+				$newArguments[] = new DumpNode($argument);
+			} elseif (is_array($argument)) {
+				if (!array_is_list($argument)) {
+					throw new InvalidArgumentException('Only list arrays are supported as constructor arguments.');
+				}
+
+				$newArguments[] = new ArrayNode($this->processConstructorArguments($argument));
+			} elseif ($argument instanceof UnitEnum) {
+				$newArguments[] = new EnumCaseNode($argument::class, $argument->name);
+			} else {
+				throw new InvalidArgumentException(sprintf('Unsupported constructor argument of type %s.', get_debug_type($argument)));
+			}
+		}
+
+		return $newArguments;
 	}
 
 }
