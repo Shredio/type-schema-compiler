@@ -50,7 +50,7 @@ final class TypeSchemaJitBundle extends AbstractBundle
 
 	public function configure(DefinitionConfigurator $definition): void
 	{
-		$definition->rootNode() // @phpstan-ignore-line
+		$definition->rootNode()
 			->addDefaultsIfNotSet()
 			->children()
 				->booleanNode('auto_refresh')
