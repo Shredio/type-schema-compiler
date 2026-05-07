@@ -31,7 +31,7 @@ final readonly class CustomTypeConvertersMapper_1662ce3dae extends Type
 		// 1. Define schema
 		$schema = $ts->arrayShape([
 			'string' => $ts->nullable($ts->string())->conversion(string: new StrictStringConverter()),
-			'float' => $ts->float()->conversion(float: new LenientNumberConverter(0.0, 1)),
+			'float' => $ts->float()->conversion(float: new LenientNumberConverter()),
 			'int' => $ts->int()->conversion(int: new LenientNumberConverter(0.0, RoundingMode::HalfAwayFromZero)),
 			'bool' => $ts->bool()->conversion(bool: new LenientBoolConverter(['yes'], ['no'])),
 		]);
