@@ -51,10 +51,8 @@ final readonly class ReflectionHelper
 
 	public static function isReadableFromOutside(ReflectionProperty $property): bool
 	{
-		if (PHP_VERSION_ID >= 80400) {
-			if ($property->hasHooks()) {
-				return $property->hasHook(\PropertyHookType::Get);
-			}
+		if ($property->hasHooks()) {
+			return $property->hasHook(\PropertyHookType::Get);
 		}
 
 		return $property->isPublic();
@@ -65,13 +63,11 @@ final readonly class ReflectionHelper
 		if ($property->isReadOnly()) {
 			return false;
 		}
-		if (PHP_VERSION_ID >= 80400) {
-			if ($property->hasHooks()) {
-				return $property->hasHook(\PropertyHookType::Set);
-			}
-			if ($property->isProtectedSet() || $property->isPrivateSet()) {
-				return false;
-			}
+		if ($property->hasHooks()) {
+			return $property->hasHook(\PropertyHookType::Set);
+		}
+		if ($property->isProtectedSet() || $property->isPrivateSet()) {
+			return false;
 		}
 
 		return $property->isPublic();
