@@ -65,11 +65,16 @@ final class MapperCompiler implements ClassMapperCompiler
 		private readonly PhpDocParser $phpDocParser,
 		private readonly bool $autoRefresh = false,
 		private readonly bool $multiProcessSafety = true,
+		private readonly bool $inlineInnerMappers = true,
 	)
 	{
 	}
 
-	public static function create(bool $autoRefresh = false, bool $multiProcessSafety = true): self
+	public static function create(
+		bool $autoRefresh = false,
+		bool $multiProcessSafety = true,
+		bool $inlineInnerMappers = true,
+	): self
 	{
 		$config = new ParserConfig([]);
 		$phpDocLexer = new Lexer($config);
@@ -80,18 +85,18 @@ final class MapperCompiler implements ClassMapperCompiler
 			$constExprParser,
 		);
 
-		return new self($phpDocLexer, $phpDocParser, $autoRefresh, $multiProcessSafety);
+		return new self($phpDocLexer, $phpDocParser, $autoRefresh, $multiProcessSafety, $inlineInnerMappers);
 	}
 
 	public function withMultiProcessSafety(bool $enabled): static
 	{
-		return new self($this->phpDocLexer, $this->phpDocParser, $this->autoRefresh, $enabled);
+		return new self($this->phpDocLexer, $this->phpDocParser, $this->autoRefresh, $enabled, $this->inlineInnerMappers);
 	}
 
 
 	public function withValidationMode(): static
 	{
-		$self = new self($this->phpDocLexer, $this->phpDocParser, true, false);
+		$self = new self($this->phpDocLexer, $this->phpDocParser, true, false, $this->inlineInnerMappers);
 		$self->validationMode = true;
 
 		return $self;
@@ -333,6 +338,10 @@ final class MapperCompiler implements ClassMapperCompiler
 		}
 
 		$this->compile($classMapperToCompile, $context);
+
+		if (!$this->inlineInnerMappers) {
+			return new MethodNode('mapper', [new ClassNameNode($className)]);
+		}
 
 		return new NewClassNode($classMapperToCompile->mapperClassName);
 	}

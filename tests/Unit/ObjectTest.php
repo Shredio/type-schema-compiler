@@ -94,6 +94,17 @@ final class ObjectTest extends TestCase
 		$this->assertCreatedMapperCount(1);
 	}
 
+	public function testNestedMapperViaMapperReference(): void
+	{
+		$this->assertCompiledSameAsFile(
+			__DIR__ . '/expected/object/PersonCompileViaMapperReference.php',
+			Person::class,
+			inlineInnerMappers: false,
+		);
+
+		$this->assertCreatedMapperCount(2); // Person and Address mappers
+	}
+
 }
 
 class CustomTypeConverters

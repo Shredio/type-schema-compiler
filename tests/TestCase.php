@@ -29,12 +29,13 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 	/**
 	 * @param class-string $className
 	 */
-	protected function compile(string $className): string
+	protected function compile(string $className, bool $inlineInnerMappers = true): string
 	{
 		$compiler = StandaloneMapperCompiler::create(
 			__DIR__ . '/Generated',
 			'Tests\\Generated\\%sMapper',
 			true,
+			$inlineInnerMappers,
 		);
 
 		$className = $compiler->compile($className);
@@ -88,13 +89,18 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase
 	/**
 	 * @param class-string $className
 	 */
-	protected function assertCompiledSameAsFile(string $expectedFile, string $className, bool $recreate = false): void
+	protected function assertCompiledSameAsFile(
+		string $expectedFile,
+		string $className,
+		bool $recreate = false,
+		bool $inlineInnerMappers = true,
+	): void
 	{
 		if ($recreate) {
-			file_put_contents($expectedFile, $this->compile($className));
+			file_put_contents($expectedFile, $this->compile($className, $inlineInnerMappers));
 		}
 
-		$this->assertStringEqualsFile($expectedFile, $this->compile($className));
+		$this->assertStringEqualsFile($expectedFile, $this->compile($className, $inlineInnerMappers));
 	}
 
 	/**

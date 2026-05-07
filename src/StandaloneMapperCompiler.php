@@ -34,6 +34,7 @@ final readonly class StandaloneMapperCompiler
 		string $directoryPath,
 		string $mapperClassNamePattern,
 		bool $hashed = false,
+		bool $inlineInnerMappers = false,
 	): self
 	{
 		if ($hashed) {
@@ -49,7 +50,7 @@ final readonly class StandaloneMapperCompiler
 		}
 
 		return new self(
-			MapperCompiler::create(true, false),
+			MapperCompiler::create(true, false, $inlineInnerMappers),
 			$objectMapperCompileInfoProvider,
 			new RegistryClassMapperProvider(RegistryClassMapperProvider::createDefaultClassMappers())
 		);
