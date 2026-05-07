@@ -65,7 +65,7 @@ final class MapperCompiler implements ClassMapperCompiler
 		private readonly PhpDocParser $phpDocParser,
 		private readonly bool $autoRefresh = false,
 		private readonly bool $multiProcessSafety = true,
-		private readonly bool $inlineInnerMappers = true,
+		private readonly bool $inlineInnerMappers = false,
 	)
 	{
 	}
@@ -73,7 +73,7 @@ final class MapperCompiler implements ClassMapperCompiler
 	public static function create(
 		bool $autoRefresh = false,
 		bool $multiProcessSafety = true,
-		bool $inlineInnerMappers = true,
+		bool $inlineInnerMappers = false,
 	): self
 	{
 		$config = new ParserConfig([]);

@@ -10,6 +10,7 @@ use Shredio\TypeSchema\Context\TypeContext;
 use Shredio\TypeSchema\Error\ErrorElement;
 use Shredio\TypeSchema\TypeSchema;
 use Shredio\TypeSchema\Types\Type;
+use Tests\Unit\Address;
 use Tests\Unit\Person2;
 
 /**
@@ -28,7 +29,7 @@ final readonly class Person2Mapper_c77dbf479d extends Type
 		$schema = $ts->arrayShape([
 			'id' => $ts->int(),
 			'name' => $ts->string(),
-			'address' => new AddressMapper_79b8c3eb3e(),
+			'address' => $ts->mapper(Address::class),
 		]);
 
 		// 2. Map values

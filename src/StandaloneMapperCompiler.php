@@ -34,7 +34,7 @@ final readonly class StandaloneMapperCompiler
 		string $directoryPath,
 		string $mapperClassNamePattern,
 		bool $hashed = false,
-		bool $inlineInnerMappers = false,
+		bool $inlineInnerMappers = true,
 	): self
 	{
 		if ($hashed) {
